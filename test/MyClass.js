@@ -13,14 +13,26 @@ MyClass.s = "my static";
 
 MyClass.sM = function sM() { return 42; };
 
+MyClass.v= function (){
+    return { "foo": "bar" }
+};
+
 module.exports = MyClass;
 
 observeObjectProperty(module, "exports", undefined,
     (o, p) => {
 
+
         if (o instanceof MyClass && p === "p") {
 
-            console.log("_______not tracing p__________");
+            console.log("< access to property p  of MyClass not traced >");
+
+            return false;
+        }
+
+        if( o === MyClass && p === "v") {
+
+            console.log("< call of MyClass.v not traced >");
 
             return false;
         }

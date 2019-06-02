@@ -1,8 +1,4 @@
 
-
-
-
-
 function getPropertyNames(o: any) {
 
 
@@ -26,7 +22,7 @@ function getPropertyNames(o: any) {
 
 }
 
-function logFunctionCall(callExpression: string, args: any[], out: any, formatter: (o: any)=> any) {
+function logFunctionCall(callExpression: string, args: any[], out: any, formatter: (o: any) => any) {
 
     const extra = {};
 
@@ -76,16 +72,12 @@ function includeStackTrace(obj: Object): void {
 const functionProxies = new WeakMap<Function, Function>();
 
 export function observeObjectProperty(
-    o: any, 
-    p: string | number | symbol, 
+    o: any,
+    p: string | number | symbol,
     interceptOutput?: (out: any) => void,
-    shouldLog: (o: any, p: string | number | symbol) => boolean = ()=> true,
-    formatter: (o: any)=> any = o=>o
+    shouldLog: (o: any, p: string | number | symbol) => boolean = () => true,
+    formatter: (o: any) => any = o => o
 ) {
-
-    if( !shouldLog(o, p) ){
-        return;
-    }
 
     const objName = o instanceof Function && !!o.name ?
         o.name
@@ -131,20 +123,26 @@ export function observeObjectProperty(
 
         }
 
-        const logAccess = (type: "GET" | "SET", value: any) =>
-            console.log(
-                `${objName}.${String(p)} ${type === "GET" ? "->" : "<-"}`,
-                (() => {
+        const logAccess = (type: "GET" | "SET", value: any) => {
 
-                    const valueAndTrace = { "value": formatter(value) };
+            if (shouldLog(o, p)) {
 
-                    includeStackTrace(valueAndTrace);
+                console.log(
+                    `${objName}.${String(p)} ${type === "GET" ? "->" : "<-"}`,
+                    (() => {
 
-                    return valueAndTrace;
+                        const valueAndTrace = { "value": formatter(value) };
 
-                })()
-            )
-            ;
+                        includeStackTrace(valueAndTrace);
+
+                        return valueAndTrace;
+
+                    })()
+                );
+
+            }
+
+        };
 
         return {
             "enumerable": propertyDescriptor.enumerable,
@@ -186,7 +184,16 @@ export function observeObjectProperty(
 
                         observe(out, shouldLog, formatter);
 
-                        logFunctionCall(`${!!new.target ? "new " : `${objName}.`}${value.name}`, args, out, formatter);
+                        if (shouldLog(value, p)) {
+
+                            logFunctionCall(
+                                `${!!new.target ? "new " : `${objName}.`}${value.name}`,
+                                args,
+                                out,
+                                formatter
+                            );
+
+                        }
 
                         return out;
 
@@ -239,11 +246,30 @@ export function observeObjectProperty(
 
                                         const f = pd.value;
 
+                                        if (!f.name) {
+
+                                            Object.defineProperty(
+                                                f,
+                                                "name",
+                                                {
+                                                    ...Object.getOwnPropertyDescriptor(value, "name"),
+                                                    "value": String(p)
+                                                }
+                                            );
+
+                                        }
+
                                         const f_ = function (...args) {
 
                                             const out = f.apply(value, args);
 
-                                            logFunctionCall(`${value.name}.${String(p)}`, args, out, formatter);
+                                            observe(out, shouldLog, formatter);
+
+                                            if (shouldLog(value, p)) {
+
+                                                logFunctionCall(`${value.name}.${f.name}`, args, out, formatter);
+
+                                            }
 
                                             return out;
 
@@ -259,7 +285,6 @@ export function observeObjectProperty(
                                         );
 
                                         return f_;
-
 
                                     })()
                                 }

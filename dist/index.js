@@ -133,7 +133,7 @@ function observeObjectProperty(o, p, interceptOutput) {
                             interceptOutput(out);
                         }
                         observe(out);
-                        logFunctionCall("" + (!!_newTarget ? "new " : objName + ".") + String(p), args, out);
+                        logFunctionCall("" + (!!_newTarget ? "new " : objName + ".") + value.name, args, out);
                         return out;
                     };
                     Object.defineProperty(valueProxy, "name", __assign({}, Object.getOwnPropertyDescriptor(value, "name"), { "value": value.name }));
@@ -226,6 +226,9 @@ function observeObject(o) {
     try {
         for (var _b = __values(getPropertyNames(o)), _c = _b.next(); !_c.done; _c = _b.next()) {
             var p = _c.value;
+            if (p === "valueOf") {
+                continue;
+            }
             try {
                 observeObjectProperty(o, p);
             }

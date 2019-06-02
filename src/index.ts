@@ -168,7 +168,7 @@ export function observeObjectProperty(o: any, p: string | number | symbol, inter
 
                         observe(out);
 
-                        logFunctionCall(`${!!new.target ? "new " : `${objName}.`}${String(p)}`, args, out);
+                        logFunctionCall(`${!!new.target ? "new " : `${objName}.`}${value.name}`, args, out);
 
                         return out;
 
@@ -310,6 +310,10 @@ function observeObject(o: any) {
     observedObjects.add(o);
 
     for (const p of getPropertyNames(o)) {
+
+        if( p === "valueOf"){
+            continue;
+        }
 
         try {
 

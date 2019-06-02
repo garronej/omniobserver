@@ -1,1 +1,1 @@
-export declare function observeObjectProperty(o: any, p: string | number | symbol, interceptOutput?: (out: any) => void): void;
+export declare function observeObjectProperty(o: any, p: string | number | symbol, interceptOutput?: (out: any) => void, shouldLog?: (o: any, p: string | number | symbol) => boolean, formatter?: (o: any) => any): void;

@@ -53,12 +53,12 @@ function getPropertyNames(o) {
     }
     return Array.from(pSet);
 }
-function logFunctionCall(callExpression, args, out) {
+function logFunctionCall(callExpression, args, out, formatter) {
     var extra = {};
     args.forEach(function (value, i) {
-        extra["p" + i] = value;
+        extra["p" + i] = formatter(value);
     });
-    extra["returns"] = out;
+    extra["returns"] = formatter(out);
     includeStackTrace(extra);
     console.log(callExpression + "(" + (args.length === 0 ? "" : args.map(function (_value, index) { return "p" + index; }).join(", ")) + ") -> ", extra);
 }
@@ -78,8 +78,16 @@ function includeStackTrace(obj) {
     });
 }
 var functionProxies = new WeakMap();
-function observeObjectProperty(o, p, interceptOutput) {
-    var objName = (function (str) { return str.charAt(0).toLowerCase() + str.slice(1); })(Object.getPrototypeOf(o).constructor.name);
+function observeObjectProperty(o, p, interceptOutput, shouldLog, formatter) {
+    if (shouldLog === void 0) { shouldLog = function () { return true; }; }
+    if (formatter === void 0) { formatter = function (o) { return o; }; }
+    if (!shouldLog(o, p)) {
+        return;
+    }
+    var objName = o instanceof Function && !!o.name ?
+        o.name
+        :
+            (function (str) { return str.charAt(0).toLowerCase() + str.slice(1); })(Object.getPrototypeOf(o).constructor.name);
     var propertyDescriptor = (function () {
         var propertyDescriptor = (function () {
             var pd = undefined;
@@ -101,7 +109,7 @@ function observeObjectProperty(o, p, interceptOutput) {
         }
         var logAccess = function (type, value) {
             return console.log(objName + "." + String(p) + " " + (type === "GET" ? "->" : "<-"), (function () {
-                var valueAndTrace = { value: value };
+                var valueAndTrace = { "value": formatter(value) };
                 includeStackTrace(valueAndTrace);
                 return valueAndTrace;
             })());
@@ -132,8 +140,8 @@ function observeObjectProperty(o, p, interceptOutput) {
                         if (!!interceptOutput) {
                             interceptOutput(out);
                         }
-                        observe(out);
-                        logFunctionCall("" + (!!_newTarget ? "new " : objName + ".") + value.name, args, out);
+                        observe(out, shouldLog, formatter);
+                        logFunctionCall("" + (!!_newTarget ? "new " : objName + ".") + value.name, args, out, formatter);
                         return out;
                     };
                     Object.defineProperty(valueProxy, "name", __assign({}, Object.getOwnPropertyDescriptor(value, "name"), { "value": value.name }));
@@ -166,15 +174,16 @@ function observeObjectProperty(o, p, interceptOutput) {
                                             args[_i] = arguments[_i];
                                         }
                                         var out = f.apply(value, args);
-                                        logFunctionCall(value.name + "." + String(p_1), args, out);
+                                        logFunctionCall(value.name + "." + String(p_1), args, out, formatter);
                                         return out;
                                     };
                                     Object.defineProperty(f_, "name", __assign({}, Object.getOwnPropertyDescriptor(f, "name"), { "value": f.name }));
                                     return f_;
                                 })() }));
                         }
-                        else {
+                        else if (["length", "name", "arguments", "caller", "prototype"].indexOf(p_1) < 0) {
                             Object.defineProperty(valueProxy, p_1, pd);
+                            observeObjectProperty(valueProxy, p_1, undefined, shouldLog, formatter);
                         }
                     };
                     try {
@@ -195,7 +204,7 @@ function observeObjectProperty(o, p, interceptOutput) {
                 }
                 else {
                     logAccess("GET", value);
-                    observe(value);
+                    observe(value, shouldLog, formatter);
                     return value;
                 }
             },
@@ -211,7 +220,7 @@ function observeObjectProperty(o, p, interceptOutput) {
 }
 exports.observeObjectProperty = observeObjectProperty;
 var observedObjects = new WeakSet();
-function observeObject(o) {
+function observeObject(o, shouldLog, formatter) {
     var e_3, _a;
     if (o instanceof Function) {
         throw new Error("cannot observe function");
@@ -233,7 +242,7 @@ function observeObject(o) {
                 continue;
             }
             try {
-                observeObjectProperty(o, p);
+                observeObjectProperty(o, p, undefined, shouldLog, formatter);
             }
             catch (error) {
                 console.log("WARNING: " + error.message);
@@ -248,7 +257,7 @@ function observeObject(o) {
         finally { if (e_3) throw e_3.error; }
     }
 }
-function observe(o) {
+function observe(o, shouldLog, formatter) {
     var then = function (o) {
         if (o instanceof Function) {
             console.log("===========>warning, function not observed", o);
@@ -257,7 +266,7 @@ function observe(o) {
         if (!(o instanceof Object)) {
             return;
         }
-        observeObject(o);
+        observeObject(o, shouldLog, formatter);
     };
     if (o instanceof Object && Object.getPrototypeOf(o).constructor.name === "Promise") {
         o.then(function (o) { return then(o); });

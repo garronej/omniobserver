@@ -1,7 +1,11 @@
+
+const assert= require("assert");
+
 const MyClass = require("./MyClass");
 
-console.log(MyClass.sM());
-console.log(MyClass.s);
+
+assert(MyClass.sM() === 42);
+assert(MyClass.s === "my static");
 
 const inst = new MyClass("hello world");
 

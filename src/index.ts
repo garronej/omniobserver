@@ -1,4 +1,8 @@
 
+
+
+
+
 function getPropertyNames(o: any) {
 
 
@@ -22,15 +26,15 @@ function getPropertyNames(o: any) {
 
 }
 
-function logFunctionCall(callExpression: string, args: any[], out: any) {
+function logFunctionCall(callExpression: string, args: any[], out: any, formatter: (o: any)=> any) {
 
     const extra = {};
 
     args.forEach((value, i) => {
-        extra[`p${i}`] = value;
+        extra[`p${i}`] = formatter(value);
     });
 
-    extra["returns"] = out;
+    extra["returns"] = formatter(out);
 
     includeStackTrace(extra);
 
@@ -71,10 +75,24 @@ function includeStackTrace(obj: Object): void {
 
 const functionProxies = new WeakMap<Function, Function>();
 
-export function observeObjectProperty(o: any, p: string | number | symbol, interceptOutput?: (out: any) => void) {
+export function observeObjectProperty(
+    o: any, 
+    p: string | number | symbol, 
+    interceptOutput?: (out: any) => void,
+    shouldLog: (o: any, p: string | number | symbol) => boolean = ()=> true,
+    formatter: (o: any)=> any = o=>o
+) {
 
-    const objName = (str => str.charAt(0).toLowerCase() + str.slice(1))
-        (Object.getPrototypeOf(o).constructor.name);
+    if( !shouldLog(o, p) ){
+        return;
+    }
+
+    const objName = o instanceof Function && !!o.name ?
+        o.name
+        :
+        (str => str.charAt(0).toLowerCase() + str.slice(1))
+            (Object.getPrototypeOf(o).constructor.name)
+        ;
 
 
     const propertyDescriptor: PropertyDescriptor = (() => {
@@ -118,7 +136,7 @@ export function observeObjectProperty(o: any, p: string | number | symbol, inter
                 `${objName}.${String(p)} ${type === "GET" ? "->" : "<-"}`,
                 (() => {
 
-                    const valueAndTrace = { value };
+                    const valueAndTrace = { "value": formatter(value) };
 
                     includeStackTrace(valueAndTrace);
 
@@ -166,9 +184,9 @@ export function observeObjectProperty(o: any, p: string | number | symbol, inter
                             interceptOutput(out);
                         }
 
-                        observe(out);
+                        observe(out, shouldLog, formatter);
 
-                        logFunctionCall(`${!!new.target ? "new " : `${objName}.`}${value.name}`, args, out);
+                        logFunctionCall(`${!!new.target ? "new " : `${objName}.`}${value.name}`, args, out, formatter);
 
                         return out;
 
@@ -206,7 +224,6 @@ export function observeObjectProperty(o: any, p: string | number | symbol, inter
 
                     }
 
-
                     for (const p of Object.getOwnPropertyNames(value)) {
 
                         const pd = Object.getOwnPropertyDescriptor(value, p)!;
@@ -226,7 +243,7 @@ export function observeObjectProperty(o: any, p: string | number | symbol, inter
 
                                             const out = f.apply(value, args);
 
-                                            logFunctionCall(`${value.name}.${String(p)}`, args, out);
+                                            logFunctionCall(`${value.name}.${String(p)}`, args, out, formatter);
 
                                             return out;
 
@@ -248,9 +265,12 @@ export function observeObjectProperty(o: any, p: string | number | symbol, inter
                                 }
                             );
 
-                        } else {
+
+                        } else if (["length", "name", "arguments", "caller", "prototype"].indexOf(p) < 0) {
 
                             Object.defineProperty(valueProxy, p, pd);
+
+                            observeObjectProperty(valueProxy, p, undefined, shouldLog, formatter);
 
                         }
 
@@ -265,7 +285,7 @@ export function observeObjectProperty(o: any, p: string | number | symbol, inter
 
                     logAccess("GET", value);
 
-                    observe(value);
+                    observe(value, shouldLog, formatter);
 
                     return value;
 
@@ -293,7 +313,11 @@ export function observeObjectProperty(o: any, p: string | number | symbol, inter
 
 const observedObjects = new WeakSet<any>();
 
-function observeObject(o: any) {
+function observeObject(
+    o: any,
+    shouldLog: (o: any, p: string | number | symbol) => boolean,
+    formatter: (o: any) => any
+) {
 
     if (o instanceof Function) {
         throw new Error("cannot observe function");
@@ -321,7 +345,7 @@ function observeObject(o: any) {
 
         try {
 
-            observeObjectProperty(o, p);
+            observeObjectProperty(o, p, undefined, shouldLog, formatter);
 
         } catch (error) {
 
@@ -333,7 +357,11 @@ function observeObject(o: any) {
 
 }
 
-function observe(o: any) {
+function observe(
+    o: any,
+    shouldLog: (o: any, p: string | number | symbol) => boolean,
+    formatter: (o: any) => any
+) {
 
     const then = (o: any) => {
 
@@ -346,7 +374,7 @@ function observe(o: any) {
             return;
         }
 
-        observeObject(o);
+        observeObject(o, shouldLog, formatter);
 
     };
 

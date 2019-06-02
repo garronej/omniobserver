@@ -1,0 +1,22 @@
+{
+  "name": "omniobserver",
+  "version": "0.1.0",
+  "description": "Trace call on an object",
+  "main": "dist/index.js",
+  "scripts": {
+    "tsc": "node ./node_modules/typescript/bin/tsc -p ./tsconfig.json"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/garronej/omniobserver.git"
+  },
+  "author": "Joseph Garrone",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/garronej/omniobserver/issues"
+  },
+  "homepage": "https://github.com/garronej/omniobserver#readme",
+  "devDependencies": {
+    "typescript": "^3.5.1"
+  }
+}

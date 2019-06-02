@@ -248,6 +248,10 @@ export function observeObjectProperty(o: any, p: string | number | symbol, inter
                                 }
                             );
 
+                        } else {
+
+                            Object.defineProperty(valueProxy, p, pd);
+
                         }
 
 
@@ -311,7 +315,7 @@ function observeObject(o: any) {
 
     for (const p of getPropertyNames(o)) {
 
-        if( p === "valueOf"){
+        if (p === "valueOf") {
             continue;
         }
 

@@ -10,6 +10,14 @@ MyClass.prototype.m = function m(){
     return this.p + " !";
 };
 
+MyClass.s= "my static";
+
+MyClass.sM = function sM(){ return 42; };
+
 module.exports = MyClass;
 
 observeObjectProperty(module, "exports");
+
+
+
+

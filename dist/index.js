@@ -173,6 +173,9 @@ function observeObjectProperty(o, p, interceptOutput) {
                                     return f_;
                                 })() }));
                         }
+                        else {
+                            Object.defineProperty(valueProxy, p_1, pd);
+                        }
                     };
                     try {
                         for (var _e = __values(Object.getOwnPropertyNames(value)), _f = _e.next(); !_f.done; _f = _e.next()) {

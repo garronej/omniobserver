@@ -53,15 +53,6 @@ function getPropertyNames(o) {
     }
     return Array.from(pSet);
 }
-function logFunctionCall(callExpression, args, out, formatter) {
-    var extra = {};
-    args.forEach(function (value, i) {
-        extra["p" + i] = formatter(value);
-    });
-    extra["returns"] = formatter(out);
-    includeStackTrace(extra);
-    console.log(callExpression + "(" + (args.length === 0 ? "" : args.map(function (_value, index) { return "p" + index; }).join(", ")) + ") -> ", extra);
-}
 function includeStackTrace(obj) {
     var stack = new Error().stack;
     Object.defineProperty(obj, "stackTrace", {
@@ -85,6 +76,28 @@ function observeObjectProperty(o, p, interceptOutput, shouldLog, formatter) {
         o.name
         :
             (function (str) { return str.charAt(0).toLowerCase() + str.slice(1); })(Object.getPrototypeOf(o).constructor.name);
+    var logAccess = function (type, value) {
+        if (!shouldLog(o, p)) {
+            return;
+        }
+        console.log(objName + "." + String(p) + " " + (type === "GET" ? "->" : "<-"), (function () {
+            var valueAndTrace = { "value": formatter(value) };
+            includeStackTrace(valueAndTrace);
+            return valueAndTrace;
+        })());
+    };
+    var logFunctionCall = function (callExpression, args, out) {
+        if (!shouldLog(o, p)) {
+            return;
+        }
+        var extra = {};
+        args.forEach(function (value, i) {
+            extra["p" + i] = formatter(value);
+        });
+        extra["returns"] = formatter(out);
+        includeStackTrace(extra);
+        console.log(callExpression + "(" + (args.length === 0 ? "" : args.map(function (_value, index) { return "p" + index; }).join(", ")) + ") -> ", extra);
+    };
     var propertyDescriptor = (function () {
         var propertyDescriptor = (function () {
             var pd = undefined;
@@ -104,15 +117,6 @@ function observeObjectProperty(o, p, interceptOutput, shouldLog, formatter) {
         if (!propertyDescriptor.configurable) {
             throw new Error("Property " + String(p) + " of " + objName + " will not be observed (not configurable)");
         }
-        var logAccess = function (type, value) {
-            if (shouldLog(o, p)) {
-                console.log(objName + "." + String(p) + " " + (type === "GET" ? "->" : "<-"), (function () {
-                    var valueAndTrace = { "value": formatter(value) };
-                    includeStackTrace(valueAndTrace);
-                    return valueAndTrace;
-                })());
-            }
-        };
         return {
             "enumerable": propertyDescriptor.enumerable,
             "configurable": true,
@@ -125,10 +129,7 @@ function observeObjectProperty(o, p, interceptOutput, shouldLog, formatter) {
                     if (functionProxies.has(value)) {
                         return functionProxies.get(value);
                     }
-                    if (!value.name) {
-                        Object.defineProperty(value, "name", __assign({}, Object.getOwnPropertyDescriptor(value, "name"), { "value": String(p) }));
-                    }
-                    var valueProxy = function _g() {
+                    var valueProxy_1 = function _g() {
                         var _newTarget = this && this instanceof _g ? this.constructor : void 0;
                         var args = [];
                         for (var _i = 0; _i < arguments.length; _i++) {
@@ -140,19 +141,20 @@ function observeObjectProperty(o, p, interceptOutput, shouldLog, formatter) {
                             interceptOutput(out);
                         }
                         observe(out, shouldLog, formatter);
-                        if (shouldLog(value, p)) {
-                            logFunctionCall("" + (!!_newTarget ? "new " : objName + ".") + value.name, args, out, formatter);
-                        }
+                        logFunctionCall([
+                            !!_newTarget ? "new " : objName + ".",
+                            p === "exports" ? (value.name || "[default export]") : String(p)
+                        ].join(""), args, out);
                         return out;
                     };
-                    Object.defineProperty(valueProxy, "name", __assign({}, Object.getOwnPropertyDescriptor(value, "name"), { "value": value.name }));
+                    Object.defineProperty(valueProxy_1, "name", __assign({}, Object.getOwnPropertyDescriptor(value, "name"), { "value": value.name }));
                     {
                         var prototype = value.prototype;
                         if (!!prototype) {
                             try {
                                 for (var _c = __values(__spread(Object.getOwnPropertyNames(prototype), Object.getOwnPropertySymbols(prototype))), _d = _c.next(); !_d.done; _d = _c.next()) {
                                     var propertyName = _d.value;
-                                    Object.defineProperty(valueProxy.prototype, propertyName, Object.getOwnPropertyDescriptor(prototype, propertyName));
+                                    Object.defineProperty(valueProxy_1.prototype, propertyName, Object.getOwnPropertyDescriptor(prototype, propertyName));
                                 }
                             }
                             catch (e_1_1) { e_1 = { error: e_1_1 }; }
@@ -164,39 +166,19 @@ function observeObjectProperty(o, p, interceptOutput, shouldLog, formatter) {
                             }
                         }
                     }
-                    var _loop_1 = function (p_1) {
-                        var pd = Object.getOwnPropertyDescriptor(value, p_1);
-                        if ("value" in pd && pd.value instanceof Function) {
-                            Object.defineProperty(valueProxy, p_1, __assign({}, pd, { "value": (function () {
-                                    var f = pd.value;
-                                    if (!f.name) {
-                                        Object.defineProperty(f, "name", __assign({}, Object.getOwnPropertyDescriptor(value, "name"), { "value": String(p_1) }));
-                                    }
-                                    var f_ = function () {
-                                        var args = [];
-                                        for (var _i = 0; _i < arguments.length; _i++) {
-                                            args[_i] = arguments[_i];
-                                        }
-                                        var out = f.apply(value, args);
-                                        observe(out, shouldLog, formatter);
-                                        if (shouldLog(value, p_1)) {
-                                            logFunctionCall(value.name + "." + f.name, args, out, formatter);
-                                        }
-                                        return out;
-                                    };
-                                    Object.defineProperty(f_, "name", __assign({}, Object.getOwnPropertyDescriptor(f, "name"), { "value": f.name }));
-                                    return f_;
-                                })() }));
-                        }
-                        else if (["length", "name", "arguments", "caller", "prototype"].indexOf(p_1) < 0) {
-                            Object.defineProperty(valueProxy, p_1, pd);
-                            observeObjectProperty(valueProxy, p_1, undefined, shouldLog, formatter);
-                        }
-                    };
                     try {
-                        for (var _e = __values(Object.getOwnPropertyNames(value)), _f = _e.next(); !_f.done; _f = _e.next()) {
+                        for (var _e = __values(Object.getOwnPropertyNames(value)
+                            .filter(function (p) { return [
+                            "length",
+                            "name",
+                            "arguments",
+                            "caller",
+                            "prototype"
+                        ].indexOf(p) < 0; })), _f = _e.next(); !_f.done; _f = _e.next()) {
                             var p_1 = _f.value;
-                            _loop_1(p_1);
+                            var pd = Object.getOwnPropertyDescriptor(value, p_1);
+                            Object.defineProperty(valueProxy_1, p_1, pd);
+                            observeObjectProperty(valueProxy_1, p_1, undefined, function (o, p) { return shouldLog(o === valueProxy_1 ? value : o, p); }, function (o) { return formatter(o === valueProxy_1 ? value : o); });
                         }
                     }
                     catch (e_2_1) { e_2 = { error: e_2_1 }; }
@@ -206,8 +188,8 @@ function observeObjectProperty(o, p, interceptOutput, shouldLog, formatter) {
                         }
                         finally { if (e_2) throw e_2.error; }
                     }
-                    functionProxies.set(value, valueProxy);
-                    return valueProxy;
+                    functionProxies.set(value, valueProxy_1);
+                    return valueProxy_1;
                 }
                 else {
                     logAccess("GET", value);

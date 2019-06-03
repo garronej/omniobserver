@@ -1,6 +1,6 @@
 {
   "name": "omniobserver",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Trace call on an object",
   "main": "dist/index.js",
   "scripts": {

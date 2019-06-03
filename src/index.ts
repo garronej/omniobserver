@@ -1,7 +1,6 @@
 
 function getPropertyNames(o: any) {
 
-
     const pSet = new Set<(string | number | symbol)>();
 
     let o_ = o;
@@ -22,24 +21,6 @@ function getPropertyNames(o: any) {
 
 }
 
-function logFunctionCall(callExpression: string, args: any[], out: any, formatter: (o: any) => any) {
-
-    const extra = {};
-
-    args.forEach((value, i) => {
-        extra[`p${i}`] = formatter(value);
-    });
-
-    extra["returns"] = formatter(out);
-
-    includeStackTrace(extra);
-
-    console.log(
-        `${callExpression}(${args.length === 0 ? "" : args.map((_value, index) => `p${index}`).join(", ")}) -> `,
-        extra
-    );
-
-}
 
 function includeStackTrace(obj: Object): void {
 
@@ -86,6 +67,50 @@ export function observeObjectProperty(
             (Object.getPrototypeOf(o).constructor.name)
         ;
 
+    const logAccess = (type: "GET" | "SET", value: any) => {
+
+        if (!shouldLog(o, p)) {
+            return;
+        }
+
+        console.log(
+            `${objName}.${String(p)} ${type === "GET" ? "->" : "<-"}`,
+            (() => {
+
+                const valueAndTrace = { "value": formatter(value) };
+
+                includeStackTrace(valueAndTrace);
+
+                return valueAndTrace;
+
+            })()
+        );
+
+    };
+
+    const logFunctionCall = (callExpression: string, args: any[], out: any) => {
+
+        if (!shouldLog(o, p)) {
+            return;
+        }
+
+        const extra = {};
+
+        args.forEach((value, i) => {
+            extra[`p${i}`] = formatter(value);
+        });
+
+        extra["returns"] = formatter(out);
+
+        includeStackTrace(extra);
+
+        console.log(
+            `${callExpression}(${args.length === 0 ? "" : args.map((_value, index) => `p${index}`).join(", ")}) -> `,
+            extra
+        );
+
+    };
+
 
     const propertyDescriptor: PropertyDescriptor = (() => {
 
@@ -123,27 +148,6 @@ export function observeObjectProperty(
 
         }
 
-        const logAccess = (type: "GET" | "SET", value: any) => {
-
-            if (shouldLog(o, p)) {
-
-                console.log(
-                    `${objName}.${String(p)} ${type === "GET" ? "->" : "<-"}`,
-                    (() => {
-
-                        const valueAndTrace = { "value": formatter(value) };
-
-                        includeStackTrace(valueAndTrace);
-
-                        return valueAndTrace;
-
-                    })()
-                );
-
-            }
-
-        };
-
         return {
             "enumerable": propertyDescriptor.enumerable,
             "configurable": true,
@@ -159,22 +163,12 @@ export function observeObjectProperty(
                         return functionProxies.get(value)!
                     }
 
-                    if (!value.name) {
-
-                        Object.defineProperty(
-                            value,
-                            "name",
-                            {
-                                ...Object.getOwnPropertyDescriptor(value, "name"),
-                                "value": String(p)
-                            }
-                        );
-
-                    }
-
                     const valueProxy = function (...args) {
 
-                        const binded = Function.prototype.bind.apply(value, [!!new.target ? null : this, ...args]);
+                        const binded = Function.prototype.bind.apply(
+                            value,
+                            [!!new.target ? null : this, ...args]
+                        );
 
                         const out = !!new.target ? new binded() : binded();
 
@@ -184,16 +178,14 @@ export function observeObjectProperty(
 
                         observe(out, shouldLog, formatter);
 
-                        if (shouldLog(value, p)) {
-
-                            logFunctionCall(
-                                `${!!new.target ? "new " : `${objName}.`}${value.name}`,
-                                args,
-                                out,
-                                formatter
-                            );
-
-                        }
+                        logFunctionCall(
+                            [
+                                !!new.target ? "new " : `${objName}.`,
+                                p === "exports" ? (value.name || "[default export]") : String(p)
+                            ].join(""),
+                            args,
+                            out
+                        );
 
                         return out;
 
@@ -231,74 +223,32 @@ export function observeObjectProperty(
 
                     }
 
-                    for (const p of Object.getOwnPropertyNames(value)) {
+
+                    for (
+                        const p
+                        of
+                        Object.getOwnPropertyNames(value)
+                            .filter(p => [
+                                "length",
+                                "name",
+                                "arguments",
+                                "caller",
+                                "prototype"
+                            ].indexOf(p) < 0)
+                    ) {
+
 
                         const pd = Object.getOwnPropertyDescriptor(value, p)!;
 
-                        if ("value" in pd && pd.value instanceof Function) {
+                        Object.defineProperty(valueProxy, p, pd);
 
-                            Object.defineProperty(
-                                valueProxy,
-                                p,
-                                {
-                                    ...pd,
-                                    "value": (() => {
-
-                                        const f = pd.value;
-
-                                        if (!f.name) {
-
-                                            Object.defineProperty(
-                                                f,
-                                                "name",
-                                                {
-                                                    ...Object.getOwnPropertyDescriptor(value, "name"),
-                                                    "value": String(p)
-                                                }
-                                            );
-
-                                        }
-
-                                        const f_ = function (...args) {
-
-                                            const out = f.apply(value, args);
-
-                                            observe(out, shouldLog, formatter);
-
-                                            if (shouldLog(value, p)) {
-
-                                                logFunctionCall(`${value.name}.${f.name}`, args, out, formatter);
-
-                                            }
-
-                                            return out;
-
-                                        };
-
-                                        Object.defineProperty(
-                                            f_,
-                                            "name",
-                                            {
-                                                ...Object.getOwnPropertyDescriptor(f, "name"),
-                                                "value": f.name
-                                            }
-                                        );
-
-                                        return f_;
-
-                                    })()
-                                }
-                            );
-
-
-                        } else if (["length", "name", "arguments", "caller", "prototype"].indexOf(p) < 0) {
-
-                            Object.defineProperty(valueProxy, p, pd);
-
-                            observeObjectProperty(valueProxy, p, undefined, shouldLog, formatter);
-
-                        }
-
+                        observeObjectProperty(
+                            valueProxy,
+                            p,
+                            undefined,
+                            (o, p) => shouldLog(o === valueProxy ? value : o, p),
+                            o => formatter(o === valueProxy ? value : o)
+                        );
 
                     }
 

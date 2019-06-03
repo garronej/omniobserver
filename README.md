@@ -1,5 +1,7 @@
 # omniobserver
 
+NOTE: Chrome debugger will show detailed call stack.
+
 Example observing WebRTC and the event listener on RTCPeerConnection.
 
 ```typescript

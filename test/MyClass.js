@@ -5,7 +5,7 @@ function MyClass(p) {
     this.p = p;
 }
 
-MyClass.prototype.m = function m() {
+MyClass.prototype.m = function mInternalName() {
     return this.p + " !";
 };
 

@@ -1,7 +1,7 @@
 
 function getPropertyNames(o: any) {
 
-    const pSet = new Set<(string | number | symbol)>();
+    const pSet = new Set<string>();
 
     let o_ = o;
 
@@ -322,13 +322,25 @@ function observeObject(
             continue;
         }
 
+        if (
+            o instanceof Uint8Array
+            &&
+            (() => { try { parseInt(p); return true; } catch{ return false; } })()
+        ) {
+            continue;
+        }
+
         try {
 
             observeObjectProperty(o, p, undefined, shouldLog, formatter);
 
         } catch (error) {
 
-            console.log(`WARNING: ${error.message}`);
+            if (shouldLog(o, p)) {
+
+                console.log(`WARNING: ${error.message}`);
+
+            }
 
         }
     }

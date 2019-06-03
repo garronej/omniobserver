@@ -224,21 +224,37 @@ function observeObject(o, shouldLog, formatter) {
         return;
     }
     observedObjects.add(o);
+    var _loop_1 = function (p) {
+        if (p === "valueOf") {
+            return "continue";
+        }
+        if (p === "length" && (o instanceof Array || o instanceof Uint8Array)) {
+            return "continue";
+        }
+        if (o instanceof Uint8Array
+            &&
+                (function () { try {
+                    parseInt(p);
+                    return true;
+                }
+                catch (_a) {
+                    return false;
+                } })()) {
+            return "continue";
+        }
+        try {
+            observeObjectProperty(o, p, undefined, shouldLog, formatter);
+        }
+        catch (error) {
+            if (shouldLog(o, p)) {
+                console.log("WARNING: " + error.message);
+            }
+        }
+    };
     try {
         for (var _b = __values(getPropertyNames(o)), _c = _b.next(); !_c.done; _c = _b.next()) {
             var p = _c.value;
-            if (p === "valueOf") {
-                continue;
-            }
-            if (p === "length" && (o instanceof Array || o instanceof Uint8Array)) {
-                continue;
-            }
-            try {
-                observeObjectProperty(o, p, undefined, shouldLog, formatter);
-            }
-            catch (error) {
-                console.log("WARNING: " + error.message);
-            }
+            _loop_1(p);
         }
     }
     catch (e_3_1) { e_3 = { error: e_3_1 }; }

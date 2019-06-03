@@ -26,7 +26,6 @@ module.exports = MyClass;
 observeObjectProperty(module, "exports", undefined,
     (o, p) => {
 
-
         if (o instanceof MyClass && p === "p") {
 
             console.log("< access to property p  of MyClass not traced >");

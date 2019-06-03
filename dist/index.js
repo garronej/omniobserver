@@ -68,6 +68,23 @@ function includeStackTrace(obj) {
         }
     });
 }
+function isPropNumber(p) {
+    try {
+        return !isNaN(parseInt(p));
+    }
+    catch (_a) {
+        return false;
+    }
+}
+function callShouldLog(shouldLog, o, p) {
+    return shouldLog(o, typeof p === "symbol" ?
+        String(p) :
+        typeof p === "number" ?
+            p :
+            isPropNumber(p) ?
+                parseInt(p) :
+                p);
+}
 var functionProxies = new WeakMap();
 function observeObjectProperty(o, p, interceptOutput, shouldLog, formatter) {
     if (shouldLog === void 0) { shouldLog = function () { return true; }; }
@@ -77,17 +94,18 @@ function observeObjectProperty(o, p, interceptOutput, shouldLog, formatter) {
         :
             (function (str) { return str.charAt(0).toLowerCase() + str.slice(1); })(Object.getPrototypeOf(o).constructor.name);
     var logAccess = function (type, value) {
-        if (!shouldLog(o, p)) {
+        if (!callShouldLog(shouldLog, o, p)) {
             return;
         }
-        console.log(objName + "." + String(p) + " " + (type === "GET" ? "->" : "<-"), (function () {
+        var isNumber = typeof p === "number" || typeof p !== "symbol" && isPropNumber(p);
+        console.log("" + objName + (isNumber ? "[" : ".") + String(p) + (isNumber ? "]" : "") + " " + (type === "GET" ? "->" : "<-"), (function () {
             var valueAndTrace = { "value": formatter(value) };
             includeStackTrace(valueAndTrace);
             return valueAndTrace;
         })());
     };
     var logFunctionCall = function (callExpression, args, out) {
-        if (!shouldLog(o, p)) {
+        if (!callShouldLog(shouldLog, o, p)) {
             return;
         }
         var extra = {};
@@ -140,10 +158,14 @@ function observeObjectProperty(o, p, interceptOutput, shouldLog, formatter) {
                         if (!!interceptOutput) {
                             interceptOutput(out);
                         }
-                        logFunctionCall([
-                            !!_newTarget ? "new " : objName + ".",
-                            p === "exports" ? (value.name || "[default export]") : String(p)
-                        ].join(""), args, out);
+                        {
+                            var isNumber = typeof p === "number" || typeof p !== "symbol" && isPropNumber(p);
+                            logFunctionCall([
+                                !!_newTarget ? "new " : "" + objName + (isNumber ? "[" : "."),
+                                p === "exports" ? (value.name || "[default export]") : String(p),
+                                isNumber ? "]" : ""
+                            ].join(""), args, out);
+                        }
                         observe(out, shouldLog, formatter);
                         return out;
                     };
@@ -224,37 +246,26 @@ function observeObject(o, shouldLog, formatter) {
         return;
     }
     observedObjects.add(o);
-    var _loop_1 = function (p) {
-        if (p === "valueOf") {
-            return "continue";
-        }
-        if (p === "length" && (o instanceof Array || o instanceof Uint8Array)) {
-            return "continue";
-        }
-        if (o instanceof Uint8Array
-            &&
-                (function () { try {
-                    parseInt(p);
-                    return true;
-                }
-                catch (_a) {
-                    return false;
-                } })()) {
-            return "continue";
-        }
-        try {
-            observeObjectProperty(o, p, undefined, shouldLog, formatter);
-        }
-        catch (error) {
-            if (shouldLog(o, p)) {
-                console.log("WARNING: " + error.message);
-            }
-        }
-    };
     try {
         for (var _b = __values(getPropertyNames(o)), _c = _b.next(); !_c.done; _c = _b.next()) {
             var p = _c.value;
-            _loop_1(p);
+            if (p === "valueOf") {
+                continue;
+            }
+            if (p === "length" && (o instanceof Array || o instanceof Uint8Array)) {
+                continue;
+            }
+            if (o instanceof Uint8Array && isPropNumber(p)) {
+                continue;
+            }
+            try {
+                observeObjectProperty(o, p, undefined, shouldLog, formatter);
+            }
+            catch (error) {
+                if (shouldLog(o, p)) {
+                    console.log("WARNING: " + error.message);
+                }
+            }
         }
     }
     catch (e_3_1) { e_3 = { error: e_3_1 }; }

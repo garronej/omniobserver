@@ -49,6 +49,35 @@ function includeStackTrace(obj: Object): void {
 
 }
 
+function isPropNumber(p: string) {
+
+    try {
+        return !isNaN(parseInt(p));
+    } catch{
+        return false;
+    }
+}
+
+function callShouldLog(
+    shouldLog: (o: any, p: string | number)=> boolean, 
+    o: any, 
+    p: string | number | symbol
+): boolean {
+    
+    return shouldLog(
+        o,
+        typeof p === "symbol" ?
+            String(p) :
+            typeof p === "number" ?
+                p :
+                isPropNumber(p) ?
+                    parseInt(p) :
+                    p
+    );
+
+}
+
+
 
 const functionProxies = new WeakMap<Function, Function>();
 
@@ -56,9 +85,11 @@ export function observeObjectProperty(
     o: any,
     p: string | number | symbol,
     interceptOutput?: (out: any) => void,
-    shouldLog: (o: any, p: string | number | symbol) => boolean = () => true,
+    shouldLog: (o: any, p: string | number) => boolean = () => true,
     formatter: (o: any) => any = o => o
 ) {
+
+
 
     const objName = o instanceof Function && !!o.name ?
         o.name
@@ -69,12 +100,14 @@ export function observeObjectProperty(
 
     const logAccess = (type: "GET" | "SET", value: any) => {
 
-        if (!shouldLog(o, p)) {
+        if (!callShouldLog(shouldLog, o, p)) {
             return;
         }
 
+        const isNumber = typeof p === "number" || typeof p !== "symbol" && isPropNumber(p);
+
         console.log(
-            `${objName}.${String(p)} ${type === "GET" ? "->" : "<-"}`,
+            `${objName}${isNumber?"[":"."}${String(p)}${isNumber?"]":""} ${type === "GET" ? "->" : "<-"}`,
             (() => {
 
                 const valueAndTrace = { "value": formatter(value) };
@@ -90,7 +123,7 @@ export function observeObjectProperty(
 
     const logFunctionCall = (callExpression: string, args: any[], out: any) => {
 
-        if (!shouldLog(o, p)) {
+        if (!callShouldLog(shouldLog,o, p)) {
             return;
         }
 
@@ -176,14 +209,24 @@ export function observeObjectProperty(
                             interceptOutput(out);
                         }
 
-                        logFunctionCall(
-                            [
-                                !!new.target ? "new " : `${objName}.`,
-                                p === "exports" ? (value.name || "[default export]") : String(p)
-                            ].join(""),
-                            args,
-                            out
-                        );
+
+
+                        {
+
+                            const isNumber = typeof p === "number" || typeof p !== "symbol" && isPropNumber(p);
+
+                            logFunctionCall(
+                                [
+                                    !!new.target ? "new " : `${objName}${isNumber ? "[" : "."}`,
+                                    p === "exports" ? (value.name || "[default export]") : String(p),
+                                    isNumber ? "]" : ""
+                                ].join(""),
+                                args,
+                                out
+                            );
+
+                        }
+
 
                         observe(out, shouldLog, formatter);
 
@@ -290,7 +333,7 @@ const observedObjects = new WeakSet<any>();
 
 function observeObject(
     o: any,
-    shouldLog: (o: any, p: string | number | symbol) => boolean,
+    shouldLog: (o: any, p: string | number) => boolean,
     formatter: (o: any) => any
 ) {
 
@@ -322,11 +365,7 @@ function observeObject(
             continue;
         }
 
-        if (
-            o instanceof Uint8Array
-            &&
-            (() => { try { parseInt(p); return true; } catch{ return false; } })()
-        ) {
+        if (o instanceof Uint8Array && isPropNumber(p)) {
             continue;
         }
 
@@ -350,7 +389,7 @@ function observeObject(
 
 function observe(
     o: any,
-    shouldLog: (o: any, p: string | number | symbol) => boolean,
+    shouldLog: (o: any, p: string | number) => boolean,
     formatter: (o: any) => any
 ) {
 

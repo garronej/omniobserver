@@ -140,11 +140,11 @@ function observeObjectProperty(o, p, interceptOutput, shouldLog, formatter) {
                         if (!!interceptOutput) {
                             interceptOutput(out);
                         }
-                        observe(out, shouldLog, formatter);
                         logFunctionCall([
                             !!_newTarget ? "new " : objName + ".",
                             p === "exports" ? (value.name || "[default export]") : String(p)
                         ].join(""), args, out);
+                        observe(out, shouldLog, formatter);
                         return out;
                     };
                     Object.defineProperty(valueProxy_1, "name", __assign({}, Object.getOwnPropertyDescriptor(value, "name"), { "value": value.name }));
@@ -228,6 +228,9 @@ function observeObject(o, shouldLog, formatter) {
         for (var _b = __values(getPropertyNames(o)), _c = _b.next(); !_c.done; _c = _b.next()) {
             var p = _c.value;
             if (p === "valueOf") {
+                continue;
+            }
+            if (p === "length" && (o instanceof Array || o instanceof Uint8Array)) {
                 continue;
             }
             try {

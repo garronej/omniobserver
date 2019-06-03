@@ -176,8 +176,6 @@ export function observeObjectProperty(
                             interceptOutput(out);
                         }
 
-                        observe(out, shouldLog, formatter);
-
                         logFunctionCall(
                             [
                                 !!new.target ? "new " : `${objName}.`,
@@ -186,6 +184,8 @@ export function observeObjectProperty(
                             args,
                             out
                         );
+
+                        observe(out, shouldLog, formatter);
 
                         return out;
 
@@ -315,6 +315,10 @@ function observeObject(
     for (const p of getPropertyNames(o)) {
 
         if (p === "valueOf") {
+            continue;
+        }
+
+        if (p === "length" && (o instanceof Array || o instanceof Uint8Array)) {
             continue;
         }
 

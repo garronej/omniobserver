@@ -6,7 +6,11 @@ function MyClass(p) {
 }
 
 MyClass.prototype.m = function mInternalName() {
-    return this.p + " !";
+    return this.p;
+};
+
+MyClass.prototype.getArray = function mInternalName() {
+    return [ "a", "b", "c" ];
 };
 
 MyClass.s = "my static";

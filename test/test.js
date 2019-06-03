@@ -11,4 +11,6 @@ assert(MyClass.v().foo === "bar");
 
 const inst = new MyClass("hello world");
 
-inst.m();
+assert(inst.getArray()[1] === "b");
+
+assert(inst.m() === "hello world");
